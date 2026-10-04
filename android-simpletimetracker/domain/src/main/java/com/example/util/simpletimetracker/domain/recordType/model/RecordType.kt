@@ -10,4 +10,7 @@ data class RecordType(
     val defaultDuration: Long,
     val note: String,
     val hidden: Boolean = false,
+    val billable: Boolean = false,
+    // Minor currency units (cents) per hour.
+    val hourlyRateMinor: Long = 0,
 )

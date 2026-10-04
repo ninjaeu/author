@@ -137,6 +137,8 @@ class DataEditDuplicateTypeViewModel @Inject constructor(
             color = type.color,
             defaultDuration = type.defaultDuration,
             note = type.note,
+            billable = type.billable,
+            hourlyRateMinor = type.hourlyRateMinor,
         )
 
         return recordTypeInteractor.add(recordType)

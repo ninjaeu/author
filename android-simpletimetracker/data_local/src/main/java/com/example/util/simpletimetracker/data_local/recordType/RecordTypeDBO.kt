@@ -36,4 +36,12 @@ data class RecordTypeDBO(
 
     @ColumnInfo(name = "note")
     val note: String,
+
+    // Default billing flag for records of this activity.
+    @ColumnInfo(name = "billable", defaultValue = "0")
+    val billable: Boolean = false,
+
+    // Hourly rate in minor currency units (cents).
+    @ColumnInfo(name = "hourly_rate_minor", defaultValue = "0")
+    val hourlyRateMinor: Long = 0,
 )

@@ -1,6 +1,7 @@
 package com.example.util.simpletimetracker.data_local.record
 
 import com.example.util.simpletimetracker.data_local.recordTag.RecordToRecordTagDBO
+import com.example.util.simpletimetracker.domain.billing.model.BillableOverride
 import com.example.util.simpletimetracker.domain.extension.dropMillis
 import com.example.util.simpletimetracker.domain.record.model.Record
 import com.example.util.simpletimetracker.domain.record.model.RecordBase
@@ -16,6 +17,7 @@ class RecordDataLocalMapper @Inject constructor() {
             timeEnded = dbo.record.timeEnded,
             comment = dbo.record.comment,
             tags = dbo.recordTags.map(::map),
+            billableOverride = BillableOverride.fromDb(dbo.record.billableOverride),
         )
     }
 
@@ -27,6 +29,7 @@ class RecordDataLocalMapper @Inject constructor() {
             timeEnded = domain.timeEnded.dropMillis(),
             comment = domain.comment,
             tagId = 0,
+            billableOverride = domain.billableOverride.dbValue,
         )
     }
 

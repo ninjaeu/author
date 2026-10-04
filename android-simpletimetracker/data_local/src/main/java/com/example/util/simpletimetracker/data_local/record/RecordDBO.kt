@@ -33,4 +33,8 @@ data class RecordDBO(
     @Deprecated("storing tag ids moved to a separate database")
     @ColumnInfo(name = "tag_id")
     val tagId: Long,
+
+    // null - use activity default, 1 - billable, 0 - non-billable.
+    @ColumnInfo(name = "billable_override")
+    val billableOverride: Int? = null,
 )

@@ -18,6 +18,8 @@ class RecordTypeDataLocalMapper @Inject constructor() {
             defaultDuration = dbo.defaultDuration,
             note = dbo.note,
             hidden = dbo.hidden,
+            billable = dbo.billable,
+            hourlyRateMinor = dbo.hourlyRateMinor,
         )
     }
 
@@ -31,6 +33,8 @@ class RecordTypeDataLocalMapper @Inject constructor() {
             defaultDuration = domain.defaultDuration,
             note = domain.note,
             hidden = domain.hidden,
+            billable = domain.billable,
+            hourlyRateMinor = domain.hourlyRateMinor,
         )
     }
 }
