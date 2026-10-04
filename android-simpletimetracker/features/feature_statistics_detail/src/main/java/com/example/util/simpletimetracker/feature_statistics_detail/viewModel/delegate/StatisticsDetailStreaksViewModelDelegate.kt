@@ -1,0 +1,190 @@
+package com.example.util.simpletimetracker.feature_statistics_detail.viewModel.delegate
+
+import androidx.lifecycle.LiveData
+import com.example.util.simpletimetracker.core.base.ViewModelDelegate
+import com.example.util.simpletimetracker.core.extension.lazySuspend
+import com.example.util.simpletimetracker.core.extension.set
+import com.example.util.simpletimetracker.core.mapper.TimeMapper
+import com.example.util.simpletimetracker.feature_base_adapter.buttonsRow.view.ButtonsRowViewData
+import com.example.util.simpletimetracker.domain.recordType.extension.getDaily
+import com.example.util.simpletimetracker.domain.base.Coordinates
+import com.example.util.simpletimetracker.domain.prefs.interactor.PrefsInteractor
+import com.example.util.simpletimetracker.domain.recordType.model.RecordTypeGoal
+import com.example.util.simpletimetracker.domain.record.model.RecordsFilter
+import com.example.util.simpletimetracker.feature_base_adapter.buttonsRow.ButtonsRowItemViewData
+import com.example.util.simpletimetracker.feature_statistics_detail.adapter.StatisticsDetailBlock
+import com.example.util.simpletimetracker.feature_statistics_detail.customView.SeriesCalendarView
+import com.example.util.simpletimetracker.feature_statistics_detail.interactor.StatisticsDetailGetGoalFromFilterInteractor
+import com.example.util.simpletimetracker.feature_statistics_detail.interactor.StatisticsDetailStreaksInteractor
+import com.example.util.simpletimetracker.feature_statistics_detail.mapper.StatisticsDetailGoalsViewDataMapper
+import com.example.util.simpletimetracker.feature_statistics_detail.mapper.mapToViewData
+import com.example.util.simpletimetracker.feature_statistics_detail.model.StatisticsDetailGoalOptionsListItem
+import com.example.util.simpletimetracker.feature_statistics_detail.model.StreaksGoal
+import com.example.util.simpletimetracker.feature_statistics_detail.viewData.StatisticsDetailStreaksGoalViewData
+import com.example.util.simpletimetracker.feature_statistics_detail.viewData.StatisticsDetailStreaksTypeViewData
+import com.example.util.simpletimetracker.feature_statistics_detail.viewData.StatisticsDetailStreaksViewData
+import com.example.util.simpletimetracker.feature_statistics_detail.viewData.StatisticsDetailViewData
+import com.example.util.simpletimetracker.navigation.Router
+import com.example.util.simpletimetracker.navigation.params.notification.PopupParams
+import com.example.util.simpletimetracker.navigation.params.screen.OptionsListParams
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+class StatisticsDetailStreaksViewModelDelegate @Inject constructor(
+    private val router: Router,
+    private val timeMapper: TimeMapper,
+    private val prefsInteractor: PrefsInteractor,
+    private val streaksInteractor: StatisticsDetailStreaksInteractor,
+    private val statisticsDetailGoalsViewDataMapper: StatisticsDetailGoalsViewDataMapper,
+    private val statisticsDetailGetGoalFromFilterInteractor: StatisticsDetailGetGoalFromFilterInteractor,
+) : StatisticsDetailViewModelDelegate, ViewModelDelegate() {
+
+    val streaksViewData: LiveData<StatisticsDetailStreaksViewData?> by lazySuspend {
+        loadEmptyStreaksViewData().also { parent?.updateContent() }
+    }
+
+    private var parent: StatisticsDetailViewModelDelegate.Parent? = null
+    private var streaksGoal: StreaksGoal = StreaksGoal.ANY
+    private var dailyGoals: Result<List<RecordTypeGoal>>? = null
+    private var compareDailyGoals: Result<List<RecordTypeGoal>>? = null
+    private var dailyGoalPosition: Int? = null
+
+    override fun attach(parent: StatisticsDetailViewModelDelegate.Parent) {
+        this.parent = parent
+    }
+
+    override fun getViewData(): StatisticsDetailViewData? {
+        return streaksViewData.value?.viewData?.let(::mapToViewData)
+    }
+
+    override fun updateViewData(animate: Boolean) {
+        delegateScope.launch {
+            streaksViewData.set(loadStreaksViewData())
+            parent?.updateContent()
+        }
+    }
+
+    override suspend fun doOnFiltersChanged() {
+        val parent = parent ?: return
+        dailyGoals = Result.success(getDailyGoals(parent.filter))
+        compareDailyGoals = Result.success(getDailyGoals(parent.comparisonFilter))
+        // TODO GOAL Preserve goal selection across date navigation
+        dailyGoalPosition = null
+    }
+
+    override fun onButtonsRowClick(
+        block: ButtonsRowItemViewData.ButtonsRowId,
+        viewData: ButtonsRowViewData,
+    ) {
+        when (block) {
+            StatisticsDetailBlock.SeriesGoal -> onStreaksGoalClick(viewData)
+            StatisticsDetailBlock.SeriesType -> onStreaksTypeClick(viewData)
+        }
+    }
+
+    private fun onStreaksTypeClick(viewData: ButtonsRowViewData) = delegateScope.launch {
+        if (viewData !is StatisticsDetailStreaksTypeViewData) return@launch
+        prefsInteractor.setStatisticsStreaksType(viewData.type)
+        updateViewData()
+    }
+
+    private fun onStreaksGoalClick(viewData: ButtonsRowViewData) {
+        if (viewData !is StatisticsDetailStreaksGoalViewData) return
+        streaksGoal = viewData.type
+        updateViewData()
+    }
+
+    override fun onButtonClick(block: StatisticsDetailBlock) {
+        if (block != StatisticsDetailBlock.SeriesGoalSelect) return
+        delegateScope.launch { showGoalSelectionDialog() }
+    }
+
+    fun onGoalSelected(position: Int) {
+        dailyGoalPosition = position
+        updateViewData()
+    }
+
+    private suspend fun showGoalSelectionDialog() {
+        val goals = getDailyGoals()
+        val selectedGoal = streaksInteractor.getSelectedGoal(goals, dailyGoalPosition)
+        val selectedPosition = goals.indexOf(selectedGoal).coerceAtLeast(0)
+        val items = goals.mapIndexed { position, goal ->
+            OptionsListParams.Item(
+                id = StatisticsDetailGoalOptionsListItem(
+                    position = position,
+                    type = StatisticsDetailGoalOptionsListItem.Type.STREAKS,
+                ),
+                text = statisticsDetailGoalsViewDataMapper.mapGoalName(goal),
+                icon = null,
+                isSelected = position == selectedPosition,
+            )
+        }
+        if (items.isNotEmpty()) {
+            router.navigate(OptionsListParams(items))
+        }
+    }
+
+    override fun onStreaksCalendarClick(
+        viewData: SeriesCalendarView.ViewData,
+        coordinates: Coordinates,
+    ) {
+        PopupParams(
+            message = timeMapper.formatDayDateYear(viewData.rangeStart),
+            anchorCoordinates = coordinates,
+        ).let(router::show)
+    }
+
+    private suspend fun getDailyGoals(
+        filters: List<RecordsFilter>,
+    ): List<RecordTypeGoal> {
+        return statisticsDetailGetGoalFromFilterInteractor.execute(filters)
+            .getDaily()
+    }
+
+    private suspend fun getDailyGoals(): List<RecordTypeGoal> {
+        // Initialize if null.
+        val goals = dailyGoals
+        val parent = parent ?: return emptyList()
+        return if (goals == null) {
+            getDailyGoals(parent.filter)
+                .also { dailyGoals = Result.success(it) }
+        } else {
+            goals.getOrNull().orEmpty()
+        }
+    }
+
+    private suspend fun getCompareDailyGoals(): List<RecordTypeGoal> {
+        // Initialize if null.
+        val goals = compareDailyGoals
+        val parent = parent ?: return emptyList()
+        return if (goals == null) {
+            getDailyGoals(parent.comparisonFilter)
+                .also { compareDailyGoals = Result.success(it) }
+        } else {
+            goals.getOrNull().orEmpty()
+        }
+    }
+
+    private fun loadEmptyStreaksViewData(): StatisticsDetailStreaksViewData {
+        return streaksInteractor.getEmptyStreaksViewData()
+    }
+
+    private suspend fun loadStreaksViewData(): StatisticsDetailStreaksViewData? {
+        val parent = parent ?: return null
+
+        return streaksInteractor.getStreaksViewData(
+            records = parent.records,
+            compareRecords = parent.compareRecords,
+            showComparison = parent.comparisonFilter.isNotEmpty(),
+            rangeLength = parent.rangeLength,
+            rangePosition = parent.rangePosition,
+            streaksType = prefsInteractor.getStatisticsStreaksType(),
+            streaksGoal = streaksGoal,
+            goals = getDailyGoals(),
+            compareGoals = getCompareDailyGoals(),
+            dailyGoalPosition = dailyGoalPosition,
+        )
+    }
+
+    companion object : StatisticsDetailViewData.Key
+}

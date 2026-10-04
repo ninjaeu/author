@@ -1,0 +1,227 @@
+package com.example.util.simpletimetracker.feature_change_record.view
+
+import android.animation.ValueAnimator
+import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.ViewGroup
+import androidx.fragment.app.activityViewModels
+import androidx.fragment.app.viewModels
+import com.example.util.simpletimetracker.core.base.BaseFragment
+import com.example.util.simpletimetracker.core.di.BaseViewModelFactory
+import com.example.util.simpletimetracker.feature_dialogs.api.DateTimeDialogListener
+import com.example.util.simpletimetracker.feature_dialogs.api.DurationDialogListener
+import com.example.util.simpletimetracker.feature_dialogs.api.OnTagValueSelectedListener
+import com.example.util.simpletimetracker.feature_dialogs.api.TypesSelectionDialogListener
+import com.example.util.simpletimetracker.core.extension.setSharedTransitions
+import com.example.util.simpletimetracker.core.extension.toViewData
+import com.example.util.simpletimetracker.core.sharedViewModel.RemoveRecordViewModel
+import com.example.util.simpletimetracker.core.utils.InsetConfiguration
+import com.example.util.simpletimetracker.core.utils.fragmentArgumentDelegate
+import com.example.util.simpletimetracker.domain.record.model.RecordBase
+import com.example.util.simpletimetracker.feature_base_adapter.record.RecordViewData
+import com.example.util.simpletimetracker.feature_change_record.api.view.ChangeRecordViewDelegateProvider
+import com.example.util.simpletimetracker.feature_change_record.viewData.ChangeRecordViewData
+import com.example.util.simpletimetracker.feature_change_record.viewModel.ChangeRecordViewModel
+import com.example.util.simpletimetracker.feature_comment_selection.api.CommentSelectionViewDelegateProvider
+import com.example.util.simpletimetracker.feature_views.extension.animateColor
+import com.example.util.simpletimetracker.navigation.params.screen.ARGS_PARAMS
+import com.example.util.simpletimetracker.navigation.params.screen.ChangeRecordParams
+import com.example.util.simpletimetracker.navigation.params.screen.ChangeRecordsFromScreen
+import com.example.util.simpletimetracker.navigation.params.screen.RecordTagValueSelectionParams
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import com.example.util.simpletimetracker.feature_change_record.databinding.ChangeRecordFragmentBinding as Binding
+
+@AndroidEntryPoint
+class ChangeRecordFragment :
+    BaseFragment<Binding>(),
+    DateTimeDialogListener,
+    DurationDialogListener,
+    TypesSelectionDialogListener,
+    OnTagValueSelectedListener {
+
+    override val inflater: (LayoutInflater, ViewGroup?, Boolean) -> Binding =
+        Binding::inflate
+
+    override var insetConfiguration: InsetConfiguration =
+        InsetConfiguration.ApplyToView { binding.root }
+
+    @Inject
+    lateinit var removeRecordViewModelFactory: BaseViewModelFactory<RemoveRecordViewModel>
+
+    @Inject
+    lateinit var commentDelegateProvider: CommentSelectionViewDelegateProvider
+
+    @Inject
+    lateinit var changeRecordViewDelegateProvider: ChangeRecordViewDelegateProvider
+
+    private val viewModel: ChangeRecordViewModel by viewModels()
+    private val removeRecordViewModel: RemoveRecordViewModel by activityViewModels(
+        factoryProducer = { removeRecordViewModelFactory },
+    )
+
+    private var typeColorAnimator: ValueAnimator? = null
+    private val core by lazy {
+        changeRecordViewDelegateProvider.provide(viewModel.editorDelegate, commentDelegateProvider)
+    }
+
+    private val extra: ChangeRecordParams by fragmentArgumentDelegate(
+        key = ARGS_PARAMS, default = ChangeRecordParams.New(0),
+    )
+
+    override fun initUi(): Unit = with(binding) {
+        postponeEnterTransition()
+
+        setPreview()
+        val transitionName: String = when (extra) {
+            is ChangeRecordParams.Tracked -> (extra as? ChangeRecordParams.Tracked)?.transitionName.orEmpty()
+            is ChangeRecordParams.Untracked -> (extra as? ChangeRecordParams.Untracked)?.transitionName.orEmpty()
+            else -> ""
+        }
+        setSharedTransitions(
+            additionalCondition = { transitionName.isNotEmpty() },
+            transitionName = transitionName,
+            sharedView = previewChangeRecord,
+        )
+        core.initUi(layoutChangeRecordCore)
+
+        setOnPreDrawListener {
+            startPostponedEnterTransition()
+        }
+    }
+
+    override fun initUx(): Unit = with(binding) {
+        core.initUx(this@ChangeRecordFragment, layoutChangeRecordCore)
+    }
+
+    override fun initViewModel() = with(binding) {
+        with(viewModel) {
+            record.observe(::updatePreview)
+            removeRecordId.observe {
+                removeRecordViewModel.onDeleteClick(
+                    recordIds = setOf(it),
+                    from = (extra as? ChangeRecordParams.Tracked)?.from,
+                )
+            }
+            core.initViewModel(this@ChangeRecordFragment, layoutChangeRecordCore)
+        }
+        with(removeRecordViewModel) {
+            prepare()
+            deleteButtonEnabled.observe(layoutChangeRecordCore.btnChangeRecordDelete::setEnabled)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.onVisible()
+    }
+
+    override fun onDestroy() {
+        typeColorAnimator?.cancel()
+        super.onDestroy()
+    }
+
+    override fun onDateTimeSet(timestamp: Long, tag: String?) {
+        viewModel.editorDelegate.onDateTimeSet(timestamp, tag)
+    }
+
+    override fun onDurationSet(durationSeconds: Long, tag: String?) {
+        viewModel.editorDelegate.onDurationSet(durationSeconds, tag)
+    }
+
+    override fun onTagValueSelected(params: RecordTagValueSelectionParams, data: Double) {
+        viewModel.editorDelegate.onCategoryValueSelected(params, data)
+    }
+
+    override fun onDataSelected(
+        tag: String,
+        dataIds: List<Long>,
+        tagValues: List<RecordBase.Tag>,
+        selectValueOnStartTagIds: List<Long>,
+    ) {
+        viewModel.editorDelegate.onDataSelected(tag, dataIds)
+    }
+
+    private fun setPreview() = when (extra) {
+        is ChangeRecordParams.Tracked -> (extra as? ChangeRecordParams.Tracked)?.preview
+        is ChangeRecordParams.Untracked -> (extra as? ChangeRecordParams.Untracked)?.preview
+        else -> null
+    }?.let { preview ->
+        ChangeRecordViewData(
+            recordPreview = RecordViewData.Tracked(
+                id = 0, // Doesn't matter for preview.
+                timeStartedTimestamp = 0,
+                timeEndedTimestamp = 0,
+                name = preview.name,
+                tagName = preview.tagName,
+                timeStarted = preview.timeStarted,
+                timeFinished = preview.timeFinished,
+                duration = preview.duration,
+                durationTotal = preview.durationTotal,
+                iconId = preview.iconId.toViewData(),
+                color = preview.color,
+                comment = preview.comment,
+            ),
+            dateTimeStarted = preview.timeStartedDateTime.toViewData(),
+            dateTimeFinished = preview.timeEndedDateTime.toViewData(),
+        ).let { updatePreview(it, animated = false) }
+
+        core.onSetPreview(
+            binding = binding.layoutChangeRecordCore,
+            color = preview.color,
+            iconId = preview.iconId.toViewData(),
+        )
+    }
+
+    private fun updatePreview(
+        item: ChangeRecordViewData,
+        animated: Boolean = true,
+    ) = with(binding.layoutChangeRecordCore) {
+        with(binding.previewChangeRecord) {
+            itemName = item.recordPreview.name
+            itemTagName = item.recordPreview.tagName
+            itemIcon = item.recordPreview.iconId
+            itemTimeStarted = item.recordPreview.timeStarted
+            itemTimeEnded = item.recordPreview.timeFinished
+            itemDuration = item.recordPreview.duration
+            itemDurationTotal = item.recordPreview.durationTotal
+            itemComment = item.recordPreview.comment
+
+            if (animated) {
+                typeColorAnimator?.cancel()
+                typeColorAnimator = animateColor(
+                    from = itemColor,
+                    to = item.recordPreview.color,
+                    doOnUpdate = { value -> itemColor = value },
+                )
+            } else {
+                itemColor = item.recordPreview.color
+            }
+        }
+
+        core.setDateTime(
+            state = item.dateTimeStarted,
+            dateView = tvChangeRecordTimeStartedDate,
+            timeView = tvChangeRecordTimeStartedTime,
+            hintView = tvChangeRecordTimeStartedAdjust,
+        )
+        core.setDateTime(
+            state = item.dateTimeFinished,
+            dateView = tvChangeRecordTimeEndedDate,
+            timeView = tvChangeRecordTimeEndedTime,
+            hintView = tvChangeRecordTimeEndedAdjust,
+        )
+
+        core.onSetPreview(
+            binding = this,
+            color = item.recordPreview.color,
+            iconId = item.recordPreview.iconId,
+        )
+    }
+
+    companion object {
+        fun createBundle(data: ChangeRecordsFromScreen): Bundle = Bundle().apply {
+            putParcelable(ARGS_PARAMS, data.params)
+        }
+    }
+}
