@@ -37,11 +37,15 @@ data class RecordTypeDBO(
     @ColumnInfo(name = "note")
     val note: String,
 
-    // Default billing flag for records of this activity.
-    @ColumnInfo(name = "billable", defaultValue = "0")
-    val billable: Boolean = false,
+    // BillingType.dbValue: 0 non-billable, 1 paid, 2 client-billable.
+    @ColumnInfo(name = "billing_type", defaultValue = "0")
+    val billingType: Int = 0,
 
     // Hourly rate in minor currency units (cents).
     @ColumnInfo(name = "hourly_rate_minor", defaultValue = "0")
     val hourlyRateMinor: Long = 0,
+
+    // Category id used as the primary project, 0 when none.
+    @ColumnInfo(name = "project_id", defaultValue = "0")
+    val projectId: Long = 0,
 )

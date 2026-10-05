@@ -1,5 +1,6 @@
 package com.example.util.simpletimetracker.domain.record.repo
 
+import com.example.util.simpletimetracker.domain.billing.model.BillingType
 import com.example.util.simpletimetracker.domain.record.model.Range
 import com.example.util.simpletimetracker.domain.record.model.Record
 import com.example.util.simpletimetracker.domain.record.model.RecordBase
@@ -62,6 +63,9 @@ interface RecordRepo {
     )
 
     suspend fun updateTimeEnded(recordId: Long, timeEnded: Long)
+
+    /** null clears the override so the record follows its activity again. */
+    suspend fun updateBillingTypeOverride(recordId: Long, type: BillingType?)
 
     suspend fun remove(id: Long)
 

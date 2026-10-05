@@ -25,10 +25,22 @@ class XlsxWriter {
         HOURS(3),
         MONEY(4),
         PERCENT(5),
+        DATE_TIME_SECONDS(6),
+        DURATION(7),
+        MONTH(8),
+        DATE(9),
     }
 
-    class Sheet(val name: String, val columnWidths: List<Double> = emptyList()) {
+    /** List validation: only the listed values are accepted in [range], e.g. "J2:J1000". */
+    class ListValidation(val range: String, val values: List<String>, val title: String, val message: String)
+
+    class Sheet(
+        val name: String,
+        val columnWidths: List<Double> = emptyList(),
+        val freezeHeader: Boolean = true,
+    ) {
         val rows = mutableListOf<List<Cell>>()
+        val validations = mutableListOf<ListValidation>()
         fun row(vararg cells: Cell) = apply { rows.add(cells.toList()) }
         fun row(cells: List<Cell>) = apply { rows.add(cells) }
     }
@@ -86,7 +98,9 @@ class XlsxWriter {
     private fun sheetXml(sheet: Sheet) = buildString {
         append(XML_HEADER)
         append("""<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">""")
-        append("""<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>""")
+        if (sheet.freezeHeader) {
+            append("""<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>""")
+        }
         if (sheet.columnWidths.isNotEmpty()) {
             append("<cols>")
             sheet.columnWidths.forEachIndexed { i, w ->
@@ -100,7 +114,17 @@ class XlsxWriter {
             cells.forEachIndexed { c, cell -> append(cellXml(columnName(c) + (r + 1), cell)) }
             append("</row>")
         }
-        append("</sheetData></worksheet>")
+        append("</sheetData>")
+        val valid = sheet.validations.filter { v -> v.values.isNotEmpty() && v.values.none { ',' in it || '"' in it } && v.values.joinToString(",").length <= MAX_LIST_LENGTH }
+        if (valid.isNotEmpty()) {
+            append("""<dataValidations count="${valid.size}">""")
+            valid.forEach { v ->
+                append("""<dataValidation type="list" allowBlank="1" showErrorMessage="1" errorTitle="${escape(v.title)}" error="${escape(v.message)}" sqref="${v.range}">""")
+                append("<formula1>${escape("\"" + v.values.joinToString(",") + "\"")}</formula1></dataValidation>")
+            }
+            append("</dataValidations>")
+        }
+        append("</worksheet>")
     }
 
     private fun cellXml(ref: String, cell: Cell): String = when (cell) {
@@ -111,6 +135,8 @@ class XlsxWriter {
     }
 
     companion object {
+        /** Excel limits an inline validation list to 255 characters. */
+        private const val MAX_LIST_LENGTH = 255
         private const val XML_HEADER = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"""
 
         private const val ROOT_RELS = XML_HEADER +
@@ -121,24 +147,32 @@ class XlsxWriter {
         // numFmt 164 date-time, 165 hours, 166 money, 167 percent.
         private const val STYLES = XML_HEADER +
             """<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">""" +
-            """<numFmts count="4">""" +
+            """<numFmts count="8">""" +
             """<numFmt numFmtId="164" formatCode="yyyy-mm-dd hh:mm"/>""" +
             """<numFmt numFmtId="165" formatCode="0.00"/>""" +
             """<numFmt numFmtId="166" formatCode="#,##0.00"/>""" +
             """<numFmt numFmtId="167" formatCode="0.0%"/>""" +
+            """<numFmt numFmtId="168" formatCode="yyyy-mm-dd hh:mm:ss"/>""" +
+            """<numFmt numFmtId="169" formatCode="[h]:mm:ss"/>""" +
+            """<numFmt numFmtId="170" formatCode="mmm yyyy"/>""" +
+            """<numFmt numFmtId="171" formatCode="yyyy-mm-dd"/>""" +
             "</numFmts>" +
             """<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>""" +
             """<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>""" +
             """<fill><patternFill patternType="solid"><fgColor rgb="FFD9E1F2"/></patternFill></fill></fills>""" +
             """<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>""" +
             """<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>""" +
-            """<cellXfs count="6">""" +
+            """<cellXfs count="10">""" +
             """<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>""" +
             """<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>""" +
             """<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>""" +
             """<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>""" +
             """<xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>""" +
             """<xf numFmtId="167" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>""" +
+            """<xf numFmtId="168" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>""" +
+            """<xf numFmtId="169" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>""" +
+            """<xf numFmtId="170" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>""" +
+            """<xf numFmtId="171" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>""" +
             "</cellXfs>" +
             """<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>""" +
             "</styleSheet>"

@@ -21,6 +21,9 @@ import com.example.util.simpletimetracker.data_local.recordType.RecordTypeGoalRe
 import com.example.util.simpletimetracker.data_local.recordType.RecordTypeRepoImpl
 import com.example.util.simpletimetracker.data_local.backup.BackupPartialRepoImpl
 import com.example.util.simpletimetracker.data_local.backup.BackupRepoImpl
+import com.example.util.simpletimetracker.data_local.billing.BillingDataRepoImpl
+import com.example.util.simpletimetracker.data_local.billing.BillingExportRepoImpl
+import com.example.util.simpletimetracker.data_local.billing.IncomeRepoImpl
 import com.example.util.simpletimetracker.data_local.durationSuggestion.DurationSuggestionRepoImpl
 import com.example.util.simpletimetracker.data_local.file.CsvRepoImpl
 import com.example.util.simpletimetracker.data_local.file.IcsRepoImpl
@@ -52,6 +55,9 @@ import com.example.util.simpletimetracker.domain.backup.repo.BackupPartialRepo
 import com.example.util.simpletimetracker.domain.backup.repo.BackupRepo
 import com.example.util.simpletimetracker.domain.backup.repo.CsvRepo
 import com.example.util.simpletimetracker.domain.backup.repo.IcsRepo
+import com.example.util.simpletimetracker.domain.billing.repo.BillingDataRepo
+import com.example.util.simpletimetracker.domain.billing.repo.BillingExportRepo
+import com.example.util.simpletimetracker.domain.billing.repo.IncomeRepo
 import com.example.util.simpletimetracker.domain.durationSuggestion.repo.DurationSuggestionRepo
 import com.example.util.simpletimetracker.domain.recordShortcut.repo.RecordShortcutRepo
 import com.example.util.simpletimetracker.domain.recordTag.repo.RecordShortcutToRecordTagRepo
@@ -167,6 +173,18 @@ interface DataLocalModuleBinds {
     @Binds
     @Singleton
     fun bindDurationSuggestionRepo(impl: DurationSuggestionRepoImpl): DurationSuggestionRepo
+
+    @Binds
+    @Singleton
+    fun bindIncomeRepo(impl: IncomeRepoImpl): IncomeRepo
+
+    @Binds
+    @Singleton
+    fun bindBillingDataRepo(impl: BillingDataRepoImpl): BillingDataRepo
+
+    @Binds
+    @Singleton
+    fun bindBillingExportRepo(impl: BillingExportRepoImpl): BillingExportRepo
 
     @Binds
     @Singleton

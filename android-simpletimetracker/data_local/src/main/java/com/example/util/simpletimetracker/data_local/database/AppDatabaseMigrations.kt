@@ -505,13 +505,19 @@ class AppDatabaseMigrations {
         private val migration_39_40 = object : Migration(39, 40) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
-                    "ALTER TABLE recordTypes ADD COLUMN billable INTEGER NOT NULL DEFAULT 0",
+                    "ALTER TABLE recordTypes ADD COLUMN billing_type INTEGER NOT NULL DEFAULT 0",
                 )
                 database.execSQL(
                     "ALTER TABLE recordTypes ADD COLUMN hourly_rate_minor INTEGER NOT NULL DEFAULT 0",
                 )
                 database.execSQL(
-                    "ALTER TABLE records ADD COLUMN billable_override INTEGER",
+                    "ALTER TABLE recordTypes ADD COLUMN project_id INTEGER NOT NULL DEFAULT 0",
+                )
+                database.execSQL(
+                    "ALTER TABLE records ADD COLUMN billing_type_override INTEGER",
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `incomeEntries` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `project_id` INTEGER NOT NULL, `kind` INTEGER NOT NULL, `amount_minor` INTEGER NOT NULL, `date` INTEGER NOT NULL, `note` TEXT NOT NULL)",
                 )
             }
         }

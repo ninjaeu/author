@@ -1,5 +1,6 @@
 package com.example.util.simpletimetracker.data_local.recordType
 
+import com.example.util.simpletimetracker.domain.billing.model.BillingType
 import com.example.util.simpletimetracker.domain.color.model.AppColor
 import com.example.util.simpletimetracker.domain.recordType.model.RecordType
 import javax.inject.Inject
@@ -18,8 +19,9 @@ class RecordTypeDataLocalMapper @Inject constructor() {
             defaultDuration = dbo.defaultDuration,
             note = dbo.note,
             hidden = dbo.hidden,
-            billable = dbo.billable,
+            billingType = BillingType.fromDbOrDefault(dbo.billingType),
             hourlyRateMinor = dbo.hourlyRateMinor,
+            projectId = dbo.projectId,
         )
     }
 
@@ -33,8 +35,9 @@ class RecordTypeDataLocalMapper @Inject constructor() {
             defaultDuration = domain.defaultDuration,
             note = domain.note,
             hidden = domain.hidden,
-            billable = domain.billable,
+            billingType = domain.billingType.dbValue,
             hourlyRateMinor = domain.hourlyRateMinor,
+            projectId = domain.projectId,
         )
     }
 }

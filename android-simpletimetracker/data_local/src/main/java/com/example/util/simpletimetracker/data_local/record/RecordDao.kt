@@ -134,6 +134,9 @@ abstract class RecordDao {
     @Query("UPDATE records SET time_ended = :timeEnded WHERE id = :recordId")
     abstract suspend fun updateTimeEnded(recordId: Long, timeEnded: Long)
 
+    @Query("UPDATE records SET billing_type_override = :value WHERE id = :recordId")
+    abstract suspend fun updateBillingTypeOverride(recordId: Long, value: Int?)
+
     @Query("DELETE FROM records WHERE id = :id")
     protected abstract suspend fun deleteRecord(id: Long)
 

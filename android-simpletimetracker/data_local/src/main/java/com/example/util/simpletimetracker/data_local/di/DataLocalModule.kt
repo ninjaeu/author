@@ -19,6 +19,7 @@ import com.example.util.simpletimetracker.data_local.record.RecordDao
 import com.example.util.simpletimetracker.data_local.recordTag.RecordTagDao
 import com.example.util.simpletimetracker.data_local.recordTag.RecordToRecordTagDao
 import com.example.util.simpletimetracker.data_local.category.RecordTypeCategoryDao
+import com.example.util.simpletimetracker.data_local.billing.IncomeEntryDao
 import com.example.util.simpletimetracker.data_local.durationSuggestion.DurationSuggestionDao
 import com.example.util.simpletimetracker.data_local.recordType.RecordTypeDao
 import com.example.util.simpletimetracker.data_local.recordType.RecordTypeGoalDao
@@ -185,6 +186,12 @@ class DataLocalModule {
     @Singleton
     fun getDurationSuggestionDao(database: AppDatabase): DurationSuggestionDao {
         return database.durationSuggestionDao()
+    }
+
+    @Provides
+    @Singleton
+    fun getIncomeEntryDao(database: AppDatabase): IncomeEntryDao {
+        return database.incomeEntryDao()
     }
 
     @Provides

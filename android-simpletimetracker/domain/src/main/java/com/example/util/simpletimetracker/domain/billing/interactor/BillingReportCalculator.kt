@@ -2,53 +2,51 @@ package com.example.util.simpletimetracker.domain.billing.interactor
 
 import com.example.util.simpletimetracker.domain.billing.model.BillingEntry
 import com.example.util.simpletimetracker.domain.billing.model.BillingReport
+import com.example.util.simpletimetracker.domain.billing.model.BillingReport.Companion.MILLIS_IN_HOUR
+import com.example.util.simpletimetracker.domain.billing.model.BillingType
+import com.example.util.simpletimetracker.domain.billing.model.IncomeEntry
 import java.math.BigDecimal
 import java.math.RoundingMode
 import javax.inject.Inject
 
 /**
- * Pure calculation of billable and non-billable totals for a time range.
- * Records are clipped to [rangeStart, rangeEnd]; a record in several projects
- * counts in each project line and once in the totals.
+ * Pure calculation of paid, client-billable and non-billable time for a range.
+ * Records are clipped to [rangeStart, rangeEnd). Income entries count in full
+ * when their date falls inside the range.
  */
 class BillingReportCalculator @Inject constructor() {
 
     fun calculate(
         entries: List<BillingEntry>,
+        income: List<IncomeEntry> = emptyList(),
         rangeStart: Long = Long.MIN_VALUE,
         rangeEnd: Long = Long.MAX_VALUE,
     ): BillingReport {
-        val byProject = mutableMapOf<String, Accumulator>()
-        val byActivity = mutableMapOf<String, Accumulator>()
-        val total = Accumulator()
+        val total = Acc()
+        val byProject = mutableMapOf<String, Acc>()
+        val byActivity = mutableMapOf<String, Acc>()
 
-        entries.forEach { entry ->
-            val millis = clippedMillis(entry, rangeStart, rangeEnd)
+        entries.forEach { e ->
+            val millis = minOf(e.timeEnded, rangeEnd) - maxOf(e.timeStarted, rangeStart)
             if (millis <= 0L) return@forEach
-            val amount = amountMinor(millis, entry.hourlyRateMinor).takeIf { entry.billable } ?: 0L
+            val amount = if (e.type == BillingType.NON_BILLABLE) 0L else amountMinor(millis, e.hourlyRateMinor)
+            total.add(e.type, millis, amount)
+            byProject.getOrPut(e.project) { Acc() }.add(e.type, millis, amount)
+            byActivity.getOrPut(e.activityName) { Acc() }.add(e.type, millis, amount)
+        }
 
-            total.add(entry.billable, millis, amount)
-            byActivity.getOrPut(entry.activityName) { Accumulator() }.add(entry.billable, millis, amount)
-            val projects = entry.projects.ifEmpty { listOf(BillingReport.UNASSIGNED_PROJECT) }
-            projects.distinct().forEach { project ->
-                byProject.getOrPut(project) { Accumulator() }.add(entry.billable, millis, amount)
-            }
+        var incomeTotal = 0L
+        income.filter { it.date >= rangeStart && it.date < rangeEnd }.forEach { i ->
+            incomeTotal += i.amountMinor
+            byProject.getOrPut(i.project) { Acc() }.incomeMinor += i.amountMinor
         }
 
         return BillingReport(
-            totalMillis = total.billableMillis + total.nonBillableMillis,
-            billableMillis = total.billableMillis,
-            nonBillableMillis = total.nonBillableMillis,
-            amountMinor = total.amountMinor,
+            total = total.split(),
             byProject = byProject.toLines(),
             byActivity = byActivity.toLines(),
+            incomeMinor = incomeTotal,
         )
-    }
-
-    private fun clippedMillis(entry: BillingEntry, rangeStart: Long, rangeEnd: Long): Long {
-        val start = maxOf(entry.timeStarted, rangeStart)
-        val end = minOf(entry.timeEnded, rangeEnd)
-        return end - start
     }
 
     private fun amountMinor(millis: Long, hourlyRateMinor: Long): Long {
@@ -58,24 +56,31 @@ class BillingReportCalculator @Inject constructor() {
             .toLong()
     }
 
-    private fun Map<String, Accumulator>.toLines(): List<BillingReport.Line> {
-        return map { (name, acc) ->
-            BillingReport.Line(name, acc.billableMillis, acc.nonBillableMillis, acc.amountMinor)
-        }.sortedWith(compareByDescending<BillingReport.Line> { it.totalMillis }.thenBy { it.name })
+    private fun Map<String, Acc>.toLines(): List<BillingReport.Line> {
+        return map { (name, acc) -> BillingReport.Line(name, acc.split(), acc.incomeMinor) }
+            .sortedWith(
+                compareByDescending<BillingReport.Line> { it.split.totalMillis }
+                    .thenByDescending { it.incomeMinor }
+                    .thenBy { it.name },
+            )
     }
 
-    private class Accumulator {
-        var billableMillis = 0L
-        var nonBillableMillis = 0L
-        var amountMinor = 0L
+    private class Acc {
+        var paid = 0L
+        var client = 0L
+        var non = 0L
+        var amount = 0L
+        var incomeMinor = 0L
 
-        fun add(billable: Boolean, millis: Long, amount: Long) {
-            if (billable) billableMillis += millis else nonBillableMillis += millis
-            amountMinor += amount
+        fun add(type: BillingType, millis: Long, amountMinor: Long) {
+            when (type) {
+                BillingType.PAID -> paid += millis
+                BillingType.CLIENT_BILLABLE -> client += millis
+                BillingType.NON_BILLABLE -> non += millis
+            }
+            amount += amountMinor
         }
-    }
 
-    companion object {
-        private const val MILLIS_IN_HOUR = 3_600_000L
+        fun split() = BillingReport.Split(paid, client, non, amount)
     }
 }

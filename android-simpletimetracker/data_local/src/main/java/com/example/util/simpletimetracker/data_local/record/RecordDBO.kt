@@ -34,7 +34,7 @@ data class RecordDBO(
     @ColumnInfo(name = "tag_id")
     val tagId: Long,
 
-    // null - use activity default, 1 - billable, 0 - non-billable.
-    @ColumnInfo(name = "billable_override")
-    val billableOverride: Int? = null,
+    // BillingType.dbValue, null - use the activity default.
+    @ColumnInfo(name = "billing_type_override")
+    val billingTypeOverride: Int? = null,
 )

@@ -7,6 +7,7 @@ import com.example.util.simpletimetracker.data_local.recordTag.RecordToRecordTag
 import com.example.util.simpletimetracker.data_local.recordTag.RecordToRecordTagDao
 import com.example.util.simpletimetracker.domain.extension.dropMillis
 import com.example.util.simpletimetracker.domain.record.model.Range
+import com.example.util.simpletimetracker.domain.billing.model.BillingType
 import com.example.util.simpletimetracker.domain.record.model.Record
 import com.example.util.simpletimetracker.domain.record.model.RecordBase
 import com.example.util.simpletimetracker.domain.record.repo.RecordRepo
@@ -215,6 +216,15 @@ class RecordRepoImpl @Inject constructor(
                 },
             )
         },
+        afterSourceAccess = { clearCache() },
+    )
+
+    override suspend fun updateBillingTypeOverride(
+        recordId: Long,
+        type: BillingType?,
+    ) = mutex.withLockedCache(
+        logMessage = "updateBillingTypeOverride",
+        accessSource = { recordDao.updateBillingTypeOverride(recordId, type?.dbValue) },
         afterSourceAccess = { clearCache() },
     )
 

@@ -1,6 +1,6 @@
 package com.example.util.simpletimetracker.domain.record.model
 
-import com.example.util.simpletimetracker.domain.billing.model.BillableOverride
+import com.example.util.simpletimetracker.domain.billing.model.BillingType
 
 data class Record(
     val id: Long = 0,
@@ -9,7 +9,8 @@ data class Record(
     override val timeEnded: Long,
     override val comment: String,
     override val tags: List<RecordBase.Tag>,
-    val billableOverride: BillableOverride = BillableOverride.INHERIT,
+    // null means use the activity default.
+    val billingTypeOverride: BillingType? = null,
 ) : RecordBase {
 
     override val typeIds: List<Long> = listOf(typeId)
