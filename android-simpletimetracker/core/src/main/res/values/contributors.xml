@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string-array name="contributors">
+        <item>\@thehale Joseph Hale</item>
+        <item>\@Daksh777 Daksh P. Jain</item>
+        <item>\@Terrance</item>
+        <item>\@kantahrek</item>
+        <item>\@gyrraf</item>
+        <item>\@preethamrn</item>
+        <item>\@rec0de</item>
+        <item>\@Chris-Peralta Chris Peralta</item>
+        <item>\@Space-FuCheng</item>
+        <item>\@bahalbach Ben Halbach</item>
+        <item>\@Zolax9</item>
+        <item>\@Poussinou</item>
+        <item>\@IlyaBizyaev Ilya Bizyaev</item>
+        <item>\@joshinils</item>
+        <item>\@JohnVeness John Veness</item>
+    </string-array>
+
+</resources>
